@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPhone Scanner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .folder-checkboxes {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+        }
+        .grid-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            padding: 1rem 0;
+        }
+        .grid-item {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            background: white;
+            transition: box-shadow 0.2s;
+            position: relative;
+            cursor: pointer;
+        }
+        .grid-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .grid-item .file-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .view-toggle {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+        }
+        .view-toggle .btn {
+            border: none;
+            border-radius: 0;
+        }
+        .view-toggle .btn:first-child {
+            border-top-left-radius: 0.375rem;
+            border-bottom-left-radius: 0.375rem;
+        }
+        .view-toggle .btn:last-child {
+            border-top-right-radius: 0.375rem;
+            border-bottom-right-radius: 0.375rem;
+        }
+        
+        .grid-item.selected {
+            border-color: #0d6efd;
+            background-color: #e7f3ff;
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+        }
+        
+        .list-row.selected {
+            background-color: #e7f3ff !important;
+        }
+        
+        .file-checkbox {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            z-index: 2;
+        }
+        
+        .selection-controls {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .selection-controls.show {
+            display: block;
+        }
+        
+        .move-modal .modal-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">
+                    <i class="fas fa-mobile-alt"></i> iPhone Scanner
+                </h1>
+                
+                <!-- Statistiques -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row text-center" id="stats">
+                            <div class="col">
+                                <h5>Chargement...</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filtres et Tri -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6><i class="fas fa-filter"></i> Filtres et Tri</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="categoryFilter" class="form-label">Type de fichier</label>
+                                <select class="form-select" id="categoryFilter">
+                                    <option value="all">Tous les fichiers</option>
+                                    <option value="image">Images</option>
+                                    <option value="video">Vidéos</option>
+                                    <option value="audio">Audio</option>
+                                    <option value="other">Autres</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Dossiers</label>
+                                <div class="folder-checkboxes" id="folderCheckboxes">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="selectAllFolders" checked>
+                                        <label class="form-check-label fw-bold" for="selectAllFolders">
+                                            Tous les dossiers
+                                        </label>
+                                    </div>
+                                    <hr class="my-2">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="sortBy" class="form-label">Trier par</label>
+                                <select class="form-select" id="sortBy">
+                                    <option value="name">Nom</option>
+                                    <option value="size">Taille</option>
+                                    <option value="folder">Dossier</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="sortOrder" class="form-label">Ordre</label>
+                                <select class="form-select" id="sortOrder">
+                                    <option value="asc">Croissant</option>
+                                    <option value="desc">Décroissant</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Actions</label>
+                                <div class="d-grid">
+                                    <button class="btn btn-primary" onclick="rescan()">
+                                        <i class="fas fa-sync"></i> Rescanner
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Résumé des filtres et contrôles d'affichage -->
+                <div class="card mb-3">
+                    <div class="card-body py-2">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <small class="text-muted">
+                                    <span id="filterSummary">Tous les fichiers</span>
+                                    <span id="fileCount" class="badge bg-primary ms-2">0</span>
+                                </small>
+                            </div>
+                            <div class="col-auto">
+                                <div class="btn-group view-toggle me-2" role="group">
+                                    <button type="button" class="btn btn-outline-secondary active" id="listViewBtn" onclick="setViewMode('list')">
+                                        <i class="fas fa-list"></i> Liste
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="gridViewBtn" onclick="setViewMode('grid')">
+                                        <i class="fas fa-th"></i> Grille
+                                    </button>
+                                </div>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">
+                                    <i class="fas fa-times"></i> Effacer filtres
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contrôles de sélection -->
+                <div class="selection-controls" id="selectionControls">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <strong id="selectedCount">0</strong> fichier(s) sélectionné(s)
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-sm btn-primary me-2" onclick="showMoveModal()">
+                                <i class="fas fa-arrows-alt"></i> Déplacer vers
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary me-2" onclick="selectAll()">
+                                <i class="fas fa-check-square"></i> Tout sélectionner
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
+                                <i class="fas fa-times"></i> Désélectionner
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Liste des fichiers -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-file"></i> Fichiers</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="filesList">
+                            <div class="text-center">
+                                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                                <p class="mt-2">Chargement des fichiers...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de déplacement -->
+    <div class="modal fade" id="moveModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Déplacer les fichiers</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Déplacer <strong id="moveFileCount">0</strong> fichier(s) vers :</p>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="moveDestination" id="newFolderOption" value="new">
+                        <label class="form-check-label" for="newFolderOption">
+                            <strong>Nouveau dossier</strong>
+                        </label>
+                    </div>
+                    <div class="ms-4 mb-3" id="newFolderInput" style="display: none;">
+                        <input type="text" class="form-control" id="newFolderName" placeholder="Nom du nouveau dossier">
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="moveDestination" id="existingFolderOption" value="existing">
+                        <label class="form-check-label" for="existingFolderOption">
+                            <strong>Dossier existant</strong>
+                        </label>
+                    </div>
+                    <div class="ms-4" id="existingFolderSelect" style="display: none;">
+                        <select class="form-select" id="targetFolder">
+                            <option value="">Sélectionner un dossier...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="moveSelectedFiles()">
+                        <i class="fas fa-arrows-alt"></i> Déplacer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let allFiles = [];
+        let availableFolders = [];
+        let currentViewMode = 'list';
+        let selectedFiles = new Set();
+        
+        // Charger les statistiques
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                document.getElementById('stats').innerHTML = `
+                    <div class="col-md-3">
+                        <i class="fas fa-file fa-2x text-primary"></i>
+                        <h5>${stats.total_files || 0}</h5>
+                        <small>Fichiers</small>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="fas fa-hdd fa-2x text-success"></i>
+                        <h5>${stats.total_size || '0 B'}</h5>
+                        <small>Taille totale</small>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="fas fa-images fa-2x text-warning"></i>
+                        <h5>${stats.categories?.image || 0}</h5>
+                        <small>Images</small>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="fas fa-video fa-2x text-info"></i>
+                        <h5>${stats.categories?.video || 0}</h5>
+                        <small>Vidéos</small>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Erreur stats:', error);
+            }
+        }
+        
+        // Charger les dossiers
+        async function loadFolders() {
+            try {
+                const response = await fetch('/api/folders');
+                availableFolders = await response.json();
+                
+                const container = document.getElementById('folderCheckboxes');
+                const selectAllHtml = container.innerHTML;
+                
+                availableFolders.forEach(folder => {
+                    container.innerHTML += `
+                        <div class="form-check">
+                            <input class="form-check-input folder-checkbox" type="checkbox" id="folder-${folder}" value="${folder}" checked>
+                            <label class="form-check-label" for="folder-${folder}">
+                                ${folder}
+                            </label>
+                        </div>
+                    `;
+                });
+                
+                // Event listener pour "Tous les dossiers"
+                document.getElementById('selectAllFolders').addEventListener('change', function() {
+                    const checkboxes = document.querySelectorAll('.folder-checkbox');
+                    checkboxes.forEach(cb => cb.checked = this.checked);
+                    loadFiles();
+                });
+                
+                // Event listeners pour les checkboxes individuelles
+                document.querySelectorAll('.folder-checkbox').forEach(cb => {
+                    cb.addEventListener('change', function() {
+                        updateSelectAllState();
+                        loadFiles();
+                    });
+                });
+                
+            } catch (error) {
+                console.error('Erreur dossiers:', error);
+            }
+        }
+        
+        // Mettre à jour l'état de "Tous les dossiers"
+        function updateSelectAllState() {
+            const allCheckboxes = document.querySelectorAll('.folder-checkbox');
+            const checkedCheckboxes = document.querySelectorAll('.folder-checkbox:checked');
+            const selectAllCheckbox = document.getElementById('selectAllFolders');
+            
+            if (checkedCheckboxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedCheckboxes.length === allCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+        
+        // Obtenir les dossiers sélectionnés
+        function getSelectedFolders() {
+            const checkedBoxes = document.querySelectorAll('.folder-checkbox:checked');
+            return Array.from(checkedBoxes).map(cb => cb.value);
+        }
+        
+        // Charger les fichiers avec filtres
+        async function loadFiles() {
+            const category = document.getElementById('categoryFilter').value;
+            const selectedFolders = getSelectedFolders();
+            const sortBy = document.getElementById('sortBy').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            
+            try {
+                const params = new URLSearchParams({
+                    category,
+                    sort_by: sortBy,
+                    sort_order: sortOrder
+                });
+                
+                // Ajouter les dossiers sélectionnés
+                selectedFolders.forEach(folder => {
+                    params.append('folders', folder);
+                });
+                
+                const response = await fetch(`/api/files?${params}`);
+                allFiles = await response.json();
+                displayFiles(allFiles);
+                updateFilterSummary();
+            } catch (error) {
+                console.error('Erreur fichiers:', error);
+                document.getElementById('filesList').innerHTML = 
+                    '<div class="alert alert-danger">Erreur de chargement</div>';
+            }
+        }
+        
+        // Mettre à jour le résumé des filtres
+        function updateFilterSummary() {
+            const category = document.getElementById('categoryFilter').value;
+            const selectedFolders = getSelectedFolders();
+            const sortBy = document.getElementById('sortBy').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            
+            let summary = [];
+            
+            if (category !== 'all') {
+                summary.push(`Type: ${category}`);
+            }
+            
+            if (selectedFolders.length < availableFolders.length) {
+                if (selectedFolders.length === 1) {
+                    summary.push(`Dossier: ${selectedFolders[0]}`);
+                } else {
+                    summary.push(`${selectedFolders.length} dossiers sélectionnés`);
+                }
+            }
+            
+            const sortText = `Tri: ${sortBy} ${sortOrder === 'desc' ? '↓' : '↑'}`;
+            summary.push(sortText);
+            
+            document.getElementById('filterSummary').textContent = 
+                summary.length > 1 ? summary.join(' • ') : 'Tous les fichiers • ' + sortText;
+            document.getElementById('fileCount').textContent = allFiles.length;
+        }
+        
+        // Afficher les fichiers selon le mode d'affichage
+        function displayFiles(files) {
+            const container = document.getElementById('filesList');
+            
+            if (!files || files.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-search fa-2x"></i>
+                        <p class="mt-2">Aucun fichier trouvé</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            if (currentViewMode === 'grid') {
+                displayFilesGrid(files, container);
+            } else {
+                displayFilesList(files, container);
+            }
+        }
+        
+        // Affichage en grille
+        function displayFilesGrid(files, container) {
+            const gridHtml = files.map(file => {
+                const icon = getFileIcon(file);
+                const isSelected = selectedFiles.has(file.name);
+                
+                return `
+                    <div class="grid-item ${isSelected ? 'selected' : ''}" 
+                         data-file-name="${file.name}" 
+                         onclick="toggleFileSelection('${file.name.replace(/'/g, "\\'")}', event)">
+                        <div class="file-checkbox">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                   onclick="event.stopPropagation()">
+                        </div>
+                        <div class="file-icon text-center">
+                            <i class="${icon.class}" style="color: ${icon.color}"></i>
+                        </div>
+                        <div class="file-name text-truncate fw-bold" title="${file.name}">
+                            ${file.name}
+                        </div>
+                        <div class="file-details">
+                            <small class="text-muted d-block">
+                                <i class="fas fa-folder me-1"></i> ${file.folder}
+                            </small>
+                            <small class="text-muted">
+                                <i class="fas fa-weight me-1"></i> ${file.size_formatted}
+                            </small>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = `<div class="grid-view">${gridHtml}</div>`;
+        }
+        
+        // Affichage en liste
+        function displayFilesList(files, container) {
+            const listHtml = `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th width="40"></th>
+                                <th>Nom</th>
+                                <th>Dossier</th>
+                                <th>Taille</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${files.map(file => {
+                                const icon = getFileIcon(file);
+                                const isSelected = selectedFiles.has(file.name);
+                                
+                                return `
+                                    <tr class="list-row ${isSelected ? 'selected' : ''}" 
+                                        data-file-name="${file.name}"
+                                        onclick="toggleFileSelection('${file.name.replace(/'/g, "\\'")}', event)"
+                                        style="cursor: pointer;">
+                                        <td class="file-checkbox">
+                                            <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                                   onclick="event.stopPropagation()">
+                                        </td>
+                                        <td>
+                                            <i class="${icon.class} me-2" style="color: ${icon.color}"></i>
+                                            <span title="${file.name}">${file.name}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark">${file.folder}</span>
+                                        </td>
+                                        <td>${file.size_formatted}</td>
+                                        <td>
+                                            <span class="badge ${getCategoryBadgeClass(file.category)}">
+                                                ${file.category}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = listHtml;
+        }
+        
+        // Obtenir l'icône selon le type de fichier
+        function getFileIcon(file) {
+            switch (file.category) {
+                case 'image':
+                    return { class: 'fas fa-image', color: '#28a745' };
+                case 'video':
+                    return { class: 'fas fa-video', color: '#dc3545' };
+                case 'audio':
+                    return { class: 'fas fa-music', color: '#ffc107' };
+                default:
+                    return { class: 'fas fa-file', color: '#6c757d' };
+            }
+        }
+        
+        // Obtenir la classe CSS pour les badges de catégorie
+        function getCategoryBadgeClass(category) {
+            switch (category) {
+                case 'image':
+                    return 'bg-success';
+                case 'video':
+                    return 'bg-danger';
+                case 'audio':
+                    return 'bg-warning';
+                default:
+                    return 'bg-secondary';
+            }
+        }
+        
+        // Changer le mode d'affichage
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            
+            // Mettre à jour les boutons
+            document.getElementById('listViewBtn').classList.toggle('active', mode === 'list');
+            document.getElementById('gridViewBtn').classList.toggle('active', mode === 'grid');
+            
+            // Réafficher les fichiers
+            displayFiles(allFiles);
+        }
+        
+        // Effacer tous les filtres
+        function clearFilters() {
+            document.getElementById('categoryFilter').value = 'all';
+            document.getElementById('selectAllFolders').checked = true;
+            document.querySelectorAll('.folder-checkbox').forEach(cb => cb.checked = true);
+            document.getElementById('sortBy').value = 'name';
+            document.getElementById('sortOrder').value = 'asc';
+            loadFiles();
+        }
+        
+        // Gestion de la sélection
+        function toggleFileSelection(fileName, event) {
+            event.stopPropagation();
+            
+            if (selectedFiles.has(fileName)) {
+                selectedFiles.delete(fileName);
+            } else {
+                selectedFiles.add(fileName);
+            }
+            
+            updateSelectionUI();
+        }
+        
+        // Mettre à jour l'interface de sélection
+        function updateSelectionUI() {
+            const count = selectedFiles.size;
+            const controls = document.getElementById('selectionControls');
+            const countElement = document.getElementById('selectedCount');
+            
+            countElement.textContent = count;
+            
+            if (count > 0) {
+                controls.classList.add('show');
+            } else {
+                controls.classList.remove('show');
+            }
+            
+            // Mettre à jour l'affichage visuel
+            if (currentViewMode === 'grid') {
+                document.querySelectorAll('.grid-item').forEach(item => {
+                    const fileName = item.dataset.fileName;
+                    const checkbox = item.querySelector('.file-checkbox input');
+                    if (selectedFiles.has(fileName)) {
+                        item.classList.add('selected');
+                        checkbox.checked = true;
+                    } else {
+                        item.classList.remove('selected');
+                        checkbox.checked = false;
+                    }
+                });
+            } else {
+                document.querySelectorAll('.list-row').forEach(row => {
+                    const fileName = row.dataset.fileName;
+                    const checkbox = row.querySelector('.file-checkbox input');
+                    if (selectedFiles.has(fileName)) {
+                        row.classList.add('selected');
+                        checkbox.checked = true;
+                    } else {
+                        row.classList.remove('selected');
+                        checkbox.checked = false;
+                    }
+                });
+            }
+        }
+        
+        // Sélectionner tout
+        function selectAll() {
+            allFiles.forEach(file => selectedFiles.add(file.name));
+            updateSelectionUI();
+        }
+        
+        // Désélectionner tout
+        function clearSelection() {
+            selectedFiles.clear();
+            updateSelectionUI();
+        }
+        
+        // Afficher le modal de déplacement
+        function showMoveModal() {
+            if (selectedFiles.size === 0) {
+                alert('Aucun fichier sélectionné');
+                return;
+            }
+            
+            document.getElementById('moveFileCount').textContent = selectedFiles.size;
+            
+            // Remplir la liste des dossiers existants
+            const targetSelect = document.getElementById('targetFolder');
+            targetSelect.innerHTML = '<option value="">Sélectionner un dossier...</option>';
+            
+            availableFolders.forEach(folder => {
+                targetSelect.innerHTML += `<option value="${folder}">${folder}</option>`;
+            });
+            
+            // Gérer les options radio
+            document.getElementById('newFolderOption').addEventListener('change', function() {
+                document.getElementById('newFolderInput').style.display = this.checked ? 'block' : 'none';
+                document.getElementById('existingFolderSelect').style.display = 'none';
+            });
+            
+            document.getElementById('existingFolderOption').addEventListener('change', function() {
+                document.getElementById('existingFolderSelect').style.display = this.checked ? 'block' : 'none';
+                document.getElementById('newFolderInput').style.display = 'none';
+            });
+            
+            const modal = new bootstrap.Modal(document.getElementById('moveModal'));
+            modal.show();
+        }
+        
+        // Déplacer les fichiers sélectionnés
+        async function moveSelectedFiles() {
+            const selectedOption = document.querySelector('input[name="moveDestination"]:checked');
+            if (!selectedOption) {
+                alert('Veuillez sélectionner une destination');
+                return;
+            }
+            
+            let targetFolder;
+            if (selectedOption.value === 'new') {
+                targetFolder = document.getElementById('newFolderName').value.trim();
+                if (!targetFolder) {
+                    alert('Veuillez entrer un nom de dossier');
+                    return;
+                }
+            } else {
+                targetFolder = document.getElementById('targetFolder').value;
+                if (!targetFolder) {
+                    alert('Veuillez sélectionner un dossier');
+                    return;
+                }
+            }
+            
+            const filesToMove = Array.from(selectedFiles);
+            
+            try {
+                const response = await fetch('/api/move-files', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        files: filesToMove,
+                        target_folder: targetFolder,
+                        create_folder: selectedOption.value === 'new'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if
