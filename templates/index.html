@@ -3,732 +3,1022 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iPhone Scanner</title>
+    <title>iPhone Explorer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .folder-checkboxes {
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 0.5rem;
+        :root {
+            --sidebar-width: 280px;
+            --toolbar-height: 52px;
+            --accent: #0d6efd;
+            --bg-sidebar: #1e1e2e;
+            --bg-sidebar-hover: #2a2a3e;
+            --bg-sidebar-active: #363650;
+            --text-sidebar: #cdd6f4;
+            --text-sidebar-dim: #7f849c;
         }
-        .grid-view {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 1rem;
-            padding: 1rem 0;
-        }
-        .grid-item {
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 1rem;
-            background: white;
-            transition: box-shadow 0.2s;
-            position: relative;
-            cursor: pointer;
-        }
-        .grid-item:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .grid-item .file-icon {
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-        .view-toggle {
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-        }
-        .view-toggle .btn {
-            border: none;
-            border-radius: 0;
-        }
-        .view-toggle .btn:first-child {
-            border-top-left-radius: 0.375rem;
-            border-bottom-left-radius: 0.375rem;
-        }
-        .view-toggle .btn:last-child {
-            border-top-right-radius: 0.375rem;
-            border-bottom-right-radius: 0.375rem;
-        }
-        
-        .grid-item.selected {
-            border-color: #0d6efd;
-            background-color: #e7f3ff;
-            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
-        }
-        
-        .list-row.selected {
-            background-color: #e7f3ff !important;
-        }
-        
-        .file-checkbox {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            z-index: 2;
-        }
-        
-        .selection-controls {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-            display: none;
-        }
-        
-        .selection-controls.show {
-            display: block;
-        }
-        
-        .move-modal .modal-body {
-            max-height: 400px;
-            overflow-y: auto;
-        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; overflow: hidden; height: 100vh; }
+
+        /* === Layout === */
+        #app { display: flex; height: 100vh; }
+        #sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--bg-sidebar); color: var(--text-sidebar); display: flex; flex-direction: column; overflow: hidden; }
+        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #toolbar { height: var(--toolbar-height); background: white; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; padding: 0 1rem; gap: 0.75rem; flex-shrink: 0; }
+        #content { flex: 1; overflow-y: auto; padding: 1rem; }
+
+        /* === Sidebar === */
+        .sidebar-header { padding: 1.25rem 1rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .sidebar-header h5 { margin: 0; font-size: 1rem; font-weight: 600; color: white; display: flex; align-items: center; gap: 0.5rem; }
+        .sidebar-stats { font-size: 0.75rem; color: var(--text-sidebar-dim); margin-top: 0.25rem; }
+
+        .sidebar-section { padding: 0.75rem 0.5rem 0.25rem 1rem; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-sidebar-dim); font-weight: 600; }
+
+        .category-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0.5rem 0.75rem; }
+        .category-chip { padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.7rem; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); color: var(--text-sidebar); background: transparent; transition: all 0.15s; }
+        .category-chip:hover { background: var(--bg-sidebar-hover); }
+        .category-chip.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+        .folder-list { flex: 1; overflow-y: auto; padding: 0.25rem 0; }
+        .folder-list::-webkit-scrollbar { width: 6px; }
+        .folder-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        .folder-item { display: flex; align-items: center; padding: 0.5rem 0.75rem 0.5rem 1rem; cursor: pointer; transition: background 0.1s; gap: 0.6rem; font-size: 0.82rem; }
+        .folder-item:hover { background: var(--bg-sidebar-hover); }
+        .folder-item.active { background: var(--bg-sidebar-active); border-right: 3px solid var(--accent); }
+        .folder-item .folder-icon { color: var(--text-sidebar-dim); width: 16px; text-align: center; }
+        .folder-item .folder-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .folder-item .folder-count { font-size: 0.7rem; color: var(--text-sidebar-dim); background: rgba(255,255,255,0.06); padding: 0.1rem 0.4rem; border-radius: 0.75rem; }
+        .folder-item .folder-status { font-size: 0.6rem; margin-left: auto; }
+        .folder-status .status-done { color: #4ade80; }
+        .folder-status .status-active { color: #fbbf24; }
+        .folder-status .status-pending { color: var(--text-sidebar-dim); opacity: 0.4; }
+
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .folder-status .fa-spin-pulse { animation: pulse 1.2s ease-in-out infinite; }
+
+        .sidebar-footer { padding: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); }
+        .sidebar-footer .btn { width: 100%; font-size: 0.8rem; }
+
+        /* === Toolbar === */
+        .toolbar-breadcrumb { font-size: 0.85rem; color: #666; flex: 1; }
+        .toolbar-breadcrumb span { color: #333; font-weight: 500; }
+        .toolbar-group { display: flex; align-items: center; gap: 0.5rem; }
+        .toolbar-btn { background: none; border: 1px solid #ddd; border-radius: 0.375rem; padding: 0.3rem 0.6rem; font-size: 0.8rem; cursor: pointer; color: #555; }
+        .toolbar-btn:hover { background: #f0f0f0; }
+        .toolbar-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .toolbar-select { font-size: 0.8rem; padding: 0.3rem 0.5rem; border: 1px solid #ddd; border-radius: 0.375rem; }
+
+        /* === Progress bar (non-blocking) === */
+        #thumb-progress { background: #fff3cd; border-bottom: 1px solid #ffc107; padding: 0.35rem 1rem; font-size: 0.78rem; display: none; flex-shrink: 0; }
+        #thumb-progress.show { display: flex; align-items: center; gap: 0.75rem; }
+        #thumb-progress .progress { flex: 1; height: 6px; }
+
+        /* === Selection bar === */
+        #selection-bar { background: var(--accent); color: white; padding: 0.5rem 1rem; display: none; align-items: center; gap: 1rem; font-size: 0.85rem; flex-shrink: 0; }
+        #selection-bar.show { display: flex; }
+        #selection-bar .btn { color: white; border: 1px solid rgba(255,255,255,0.3); font-size: 0.8rem; padding: 0.25rem 0.6rem; }
+        #selection-bar .btn:hover { background: rgba(255,255,255,0.15); }
+
+        /* === File Grid === */
+        .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; }
+        .file-card { background: white; border-radius: 0.5rem; overflow: hidden; cursor: pointer; position: relative; transition: box-shadow 0.15s, transform 0.1s; border: 2px solid transparent; }
+        .file-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-1px); }
+        .file-card.selected { border-color: var(--accent); background: #e7f3ff; }
+        .file-card .thumb-wrap { width: 100%; height: 140px; background: #eee; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .file-card .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; }
+        .file-card .thumb-placeholder { color: #aaa; font-size: 2.5rem; }
+        .file-card .card-info { padding: 0.4rem 0.5rem; }
+        .file-card .card-name { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
+        .file-card .card-meta { font-size: 0.65rem; color: #999; }
+        .file-card .card-check { position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.7); background: rgba(0,0,0,0.25); display: none; align-items: center; justify-content: center; color: white; font-size: 0.7rem; }
+        .file-card:hover .card-check, .file-card.selected .card-check { display: flex; }
+        .file-card.selected .card-check { background: var(--accent); border-color: var(--accent); }
+        .file-card .card-backed-up { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border-radius: 50%; background: rgba(25,135,84,0.85); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.6rem; }
+        .file-card.backed-up { opacity: 0.7; }
+
+        /* === Infinite scroll sentinel === */
+        #scroll-sentinel { height: 60px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 0.85rem; }
+
+        /* === Empty state === */
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #999; }
+        .empty-state i { font-size: 4rem; margin-bottom: 1rem; color: #ddd; }
+
+        /* === Lightbox === */
+        .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
+        .lightbox.active { display: flex; }
+        .lightbox-close { position: absolute; top: 15px; right: 20px; color: white; font-size: 1.8rem; cursor: pointer; background: none; border: none; opacity: 0.7; z-index: 10001; }
+        .lightbox-close:hover { opacity: 1; }
+        .lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); color: white; font-size: 2.5rem; cursor: pointer; background: rgba(0,0,0,0.3); border: none; padding: 12px 18px; border-radius: 4px; opacity: 0.6; z-index: 10001; }
+        .lightbox-nav:hover { opacity: 1; }
+        .lightbox-prev { left: 15px; }
+        .lightbox-next { right: 15px; }
+        .lightbox-img { max-width: 90vw; max-height: 82vh; object-fit: contain; }
+        .lightbox-info { color: white; text-align: center; margin-top: 10px; font-size: 0.85rem; opacity: 0.8; }
+        .lightbox-spinner { color: white; font-size: 3rem; }
+
+        /* === Copy modal === */
+        .verify-ok { color: #198754; }
+        .verify-fail { color: #dc3545; }
+
+        /* === Loading screen === */
+        #loading-screen { position: fixed; inset: 0; background: var(--bg-sidebar); z-index: 20000; display: flex; align-items: center; justify-content: center; color: white; }
+        #loading-screen .loading-box { text-align: center; }
+        #loading-screen .spinner-border { width: 3rem; height: 3rem; margin-bottom: 1rem; }
+        #loading-screen p { color: var(--text-sidebar-dim); font-size: 0.9rem; }
     </style>
 </head>
-<body class="bg-light">
-    <div class="container-fluid py-4">
-        <div class="row">
-            <div class="col-12">
-                <h1 class="text-center mb-4">
-                    <i class="fas fa-mobile-alt"></i> iPhone Scanner
-                </h1>
-                
-                <!-- Statistiques -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <div class="row text-center" id="stats">
-                            <div class="col">
-                                <h5>Chargement...</h5>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Filtres et Tri -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h6><i class="fas fa-filter"></i> Filtres et Tri</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <label for="categoryFilter" class="form-label">Type de fichier</label>
-                                <select class="form-select" id="categoryFilter">
-                                    <option value="all">Tous les fichiers</option>
-                                    <option value="image">Images</option>
-                                    <option value="video">Vidéos</option>
-                                    <option value="audio">Audio</option>
-                                    <option value="other">Autres</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Dossiers</label>
-                                <div class="folder-checkboxes" id="folderCheckboxes">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="selectAllFolders" checked>
-                                        <label class="form-check-label fw-bold" for="selectAllFolders">
-                                            Tous les dossiers
-                                        </label>
-                                    </div>
-                                    <hr class="my-2">
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <label for="sortBy" class="form-label">Trier par</label>
-                                <select class="form-select" id="sortBy">
-                                    <option value="name">Nom</option>
-                                    <option value="size">Taille</option>
-                                    <option value="folder">Dossier</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label for="sortOrder" class="form-label">Ordre</label>
-                                <select class="form-select" id="sortOrder">
-                                    <option value="asc">Croissant</option>
-                                    <option value="desc">Décroissant</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Actions</label>
-                                <div class="d-grid">
-                                    <button class="btn btn-primary" onclick="rescan()">
-                                        <i class="fas fa-sync"></i> Rescanner
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Résumé des filtres et contrôles d'affichage -->
-                <div class="card mb-3">
-                    <div class="card-body py-2">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <small class="text-muted">
-                                    <span id="filterSummary">Tous les fichiers</span>
-                                    <span id="fileCount" class="badge bg-primary ms-2">0</span>
-                                </small>
-                            </div>
-                            <div class="col-auto">
-                                <div class="btn-group view-toggle me-2" role="group">
-                                    <button type="button" class="btn btn-outline-secondary active" id="listViewBtn" onclick="setViewMode('list')">
-                                        <i class="fas fa-list"></i> Liste
-                                    </button>
-                                    <button type="button" class="btn btn-outline-secondary" id="gridViewBtn" onclick="setViewMode('grid')">
-                                        <i class="fas fa-th"></i> Grille
-                                    </button>
-                                </div>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">
-                                    <i class="fas fa-times"></i> Effacer filtres
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Contrôles de sélection -->
-                <div class="selection-controls" id="selectionControls">
-                    <div class="row align-items-center">
-                        <div class="col">
-                            <strong id="selectedCount">0</strong> fichier(s) sélectionné(s)
-                        </div>
-                        <div class="col-auto">
-                            <button class="btn btn-sm btn-primary me-2" onclick="showMoveModal()">
-                                <i class="fas fa-arrows-alt"></i> Déplacer vers
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary me-2" onclick="selectAll()">
-                                <i class="fas fa-check-square"></i> Tout sélectionner
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
-                                <i class="fas fa-times"></i> Désélectionner
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Liste des fichiers -->
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="fas fa-file"></i> Fichiers</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="filesList">
-                            <div class="text-center">
-                                <i class="fas fa-spinner fa-spin fa-2x"></i>
-                                <p class="mt-2">Chargement des fichiers...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<body>
+
+<!-- Loading screen (scan only) -->
+<div id="loading-screen">
+    <div class="loading-box">
+        <div class="spinner-border text-primary" role="status"></div>
+        <h5>iPhone Explorer</h5>
+        <p id="loading-msg">Connexion...</p>
+    </div>
+</div>
+
+<div id="app" style="display:none">
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h5><i class="fas fa-mobile-alt"></i> iPhone Explorer</h5>
+            <div class="sidebar-stats" id="sidebar-stats"></div>
+        </div>
+
+        <div class="sidebar-section">Catégories</div>
+        <div class="category-chips" id="category-chips">
+            <button class="category-chip active" data-cat="all">Tout</button>
+            <button class="category-chip" data-cat="image"><i class="fas fa-image"></i> Images</button>
+            <button class="category-chip" data-cat="video"><i class="fas fa-video"></i> Vidéos</button>
+            <button class="category-chip" data-cat="audio"><i class="fas fa-music"></i> Audio</button>
+            <button class="category-chip" data-cat="other"><i class="fas fa-file"></i> Autres</button>
+        </div>
+
+        <div class="sidebar-section">Vues</div>
+        <div id="views-list">
+            <div class="folder-item" id="view-largest" onclick="selectViewLargest()">
+                <i class="fas fa-weight-hanging folder-icon"></i>
+                <span class="folder-name">Fichiers volumineux</span>
             </div>
+        </div>
+
+        <div class="sidebar-section">Dossiers</div>
+        <div class="folder-list" id="folder-list"></div>
+
+        <div class="sidebar-footer">
+            <button class="btn btn-outline-light btn-sm" onclick="rescan()"><i class="fas fa-sync-alt"></i> Re-scanner</button>
         </div>
     </div>
 
-    <!-- Modal de déplacement -->
-    <div class="modal fade" id="moveModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Déplacer les fichiers</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Déplacer <strong id="moveFileCount">0</strong> fichier(s) vers :</p>
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="radio" name="moveDestination" id="newFolderOption" value="new">
-                        <label class="form-check-label" for="newFolderOption">
-                            <strong>Nouveau dossier</strong>
-                        </label>
-                    </div>
-                    <div class="ms-4 mb-3" id="newFolderInput" style="display: none;">
-                        <input type="text" class="form-control" id="newFolderName" placeholder="Nom du nouveau dossier">
-                    </div>
-                    
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="radio" name="moveDestination" id="existingFolderOption" value="existing">
-                        <label class="form-check-label" for="existingFolderOption">
-                            <strong>Dossier existant</strong>
-                        </label>
-                    </div>
-                    <div class="ms-4" id="existingFolderSelect" style="display: none;">
-                        <select class="form-select" id="targetFolder">
-                            <option value="">Sélectionner un dossier...</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="button" class="btn btn-primary" onclick="moveSelectedFiles()">
-                        <i class="fas fa-arrows-alt"></i> Déplacer
-                    </button>
-                </div>
+    <!-- Main content -->
+    <div id="main">
+        <!-- Thumbnail progress (non-blocking) -->
+        <div id="thumb-progress">
+            <i class="fas fa-images"></i>
+            <span id="thumb-progress-text">Génération des vignettes...</span>
+            <div class="progress"><div class="progress-bar" id="thumb-progress-bar"></div></div>
+            <span id="thumb-progress-count"></span>
+        </div>
+
+        <!-- Selection bar -->
+        <div id="selection-bar">
+            <span id="selection-count">0 sélectionné(s)</span>
+            <button class="btn btn-sm" onclick="copySelected()"><i class="fas fa-download"></i> Copier sur PC</button>
+            <button class="btn btn-sm" onclick="moveSelected()"><i class="fas fa-arrow-right"></i> Déplacer (copie + vérification)</button>
+            <button class="btn btn-sm" onclick="clearSelection()"><i class="fas fa-times"></i> Annuler</button>
+            <div style="flex:1"></div>
+        </div>
+
+        <!-- Toolbar -->
+        <div id="toolbar">
+            <div class="toolbar-breadcrumb">
+                <i class="fas fa-folder-open"></i>
+                <span id="breadcrumb-text">Tous les fichiers</span>
+                <span id="breadcrumb-count" style="color:#999; font-weight:normal"></span>
+            </div>
+            <div class="toolbar-group">
+                <select class="toolbar-select" id="sort-select" onchange="changeSort()">
+                    <option value="name-asc">Nom A-Z</option>
+                    <option value="name-desc">Nom Z-A</option>
+                    <option value="date-desc">Date récente</option>
+                    <option value="date-asc">Date ancienne</option>
+                    <option value="size-desc">Taille desc</option>
+                    <option value="size-asc">Taille asc</option>
+                </select>
+                <button class="toolbar-btn" onclick="selectAll()" title="Tout sélectionner"><i class="fas fa-check-double"></i></button>
+            </div>
+        </div>
+
+        <!-- File content area -->
+        <div id="content">
+            <div class="file-grid" id="file-grid"></div>
+            <div id="scroll-sentinel"><div class="spinner-border spinner-border-sm text-secondary" style="display:none" id="load-spinner"></div></div>
+            <div class="empty-state" id="empty-state" style="display:none">
+                <i class="fas fa-folder-open"></i>
+                <h5>Aucun fichier</h5>
+                <p>Sélectionnez un dossier dans la barre latérale</p>
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let allFiles = [];
-        let availableFolders = [];
-        let currentViewMode = 'list';
-        let selectedFiles = new Set();
-        
-        // Charger les statistiques
-        async function loadStats() {
-            try {
-                const response = await fetch('/api/stats');
-                const stats = await response.json();
-                
-                document.getElementById('stats').innerHTML = `
-                    <div class="col-md-3">
-                        <i class="fas fa-file fa-2x text-primary"></i>
-                        <h5>${stats.total_files || 0}</h5>
-                        <small>Fichiers</small>
-                    </div>
-                    <div class="col-md-3">
-                        <i class="fas fa-hdd fa-2x text-success"></i>
-                        <h5>${stats.total_size || '0 B'}</h5>
-                        <small>Taille totale</small>
-                    </div>
-                    <div class="col-md-3">
-                        <i class="fas fa-images fa-2x text-warning"></i>
-                        <h5>${stats.categories?.image || 0}</h5>
-                        <small>Images</small>
-                    </div>
-                    <div class="col-md-3">
-                        <i class="fas fa-video fa-2x text-info"></i>
-                        <h5>${stats.categories?.video || 0}</h5>
-                        <small>Vidéos</small>
-                    </div>
-                `;
-            } catch (error) {
-                console.error('Erreur stats:', error);
-            }
-        }
-        
-        // Charger les dossiers
-        async function loadFolders() {
-            try {
-                const response = await fetch('/api/folders');
-                availableFolders = await response.json();
-                
-                const container = document.getElementById('folderCheckboxes');
-                const selectAllHtml = container.innerHTML;
-                
-                availableFolders.forEach(folder => {
-                    container.innerHTML += `
-                        <div class="form-check">
-                            <input class="form-check-input folder-checkbox" type="checkbox" id="folder-${folder}" value="${folder}" checked>
-                            <label class="form-check-label" for="folder-${folder}">
-                                ${folder}
-                            </label>
-                        </div>
-                    `;
-                });
-                
-                // Event listener pour "Tous les dossiers"
-                document.getElementById('selectAllFolders').addEventListener('change', function() {
-                    const checkboxes = document.querySelectorAll('.folder-checkbox');
-                    checkboxes.forEach(cb => cb.checked = this.checked);
-                    loadFiles();
-                });
-                
-                // Event listeners pour les checkboxes individuelles
-                document.querySelectorAll('.folder-checkbox').forEach(cb => {
-                    cb.addEventListener('change', function() {
-                        updateSelectAllState();
-                        loadFiles();
-                    });
-                });
-                
-            } catch (error) {
-                console.error('Erreur dossiers:', error);
-            }
-        }
-        
-        // Mettre à jour l'état de "Tous les dossiers"
-        function updateSelectAllState() {
-            const allCheckboxes = document.querySelectorAll('.folder-checkbox');
-            const checkedCheckboxes = document.querySelectorAll('.folder-checkbox:checked');
-            const selectAllCheckbox = document.getElementById('selectAllFolders');
-            
-            if (checkedCheckboxes.length === 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            } else if (checkedCheckboxes.length === allCheckboxes.length) {
-                selectAllCheckbox.checked = true;
-                selectAllCheckbox.indeterminate = false;
-            } else {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = true;
-            }
-        }
-        
-        // Obtenir les dossiers sélectionnés
-        function getSelectedFolders() {
-            const checkedBoxes = document.querySelectorAll('.folder-checkbox:checked');
-            return Array.from(checkedBoxes).map(cb => cb.value);
-        }
-        
-        // Charger les fichiers avec filtres
-        async function loadFiles() {
-            const category = document.getElementById('categoryFilter').value;
-            const selectedFolders = getSelectedFolders();
-            const sortBy = document.getElementById('sortBy').value;
-            const sortOrder = document.getElementById('sortOrder').value;
-            
-            try {
-                const params = new URLSearchParams({
-                    category,
-                    sort_by: sortBy,
-                    sort_order: sortOrder
-                });
-                
-                // Ajouter les dossiers sélectionnés
-                selectedFolders.forEach(folder => {
-                    params.append('folders', folder);
-                });
-                
-                const response = await fetch(`/api/files?${params}`);
-                allFiles = await response.json();
-                displayFiles(allFiles);
-                updateFilterSummary();
-            } catch (error) {
-                console.error('Erreur fichiers:', error);
-                document.getElementById('filesList').innerHTML = 
-                    '<div class="alert alert-danger">Erreur de chargement</div>';
-            }
-        }
-        
-        // Mettre à jour le résumé des filtres
-        function updateFilterSummary() {
-            const category = document.getElementById('categoryFilter').value;
-            const selectedFolders = getSelectedFolders();
-            const sortBy = document.getElementById('sortBy').value;
-            const sortOrder = document.getElementById('sortOrder').value;
-            
-            let summary = [];
-            
-            if (category !== 'all') {
-                summary.push(`Type: ${category}`);
-            }
-            
-            if (selectedFolders.length < availableFolders.length) {
-                if (selectedFolders.length === 1) {
-                    summary.push(`Dossier: ${selectedFolders[0]}`);
-                } else {
-                    summary.push(`${selectedFolders.length} dossiers sélectionnés`);
-                }
-            }
-            
-            const sortText = `Tri: ${sortBy} ${sortOrder === 'desc' ? '↓' : '↑'}`;
-            summary.push(sortText);
-            
-            document.getElementById('filterSummary').textContent = 
-                summary.length > 1 ? summary.join(' • ') : 'Tous les fichiers • ' + sortText;
-            document.getElementById('fileCount').textContent = allFiles.length;
-        }
-        
-        // Afficher les fichiers selon le mode d'affichage
-        function displayFiles(files) {
-            const container = document.getElementById('filesList');
-            
-            if (!files || files.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center text-muted py-4">
-                        <i class="fas fa-search fa-2x"></i>
-                        <p class="mt-2">Aucun fichier trouvé</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            if (currentViewMode === 'grid') {
-                displayFilesGrid(files, container);
-            } else {
-                displayFilesList(files, container);
-            }
-        }
-        
-        // Affichage en grille
-        function displayFilesGrid(files, container) {
-            const gridHtml = files.map(file => {
-                const icon = getFileIcon(file);
-                const isSelected = selectedFiles.has(file.name);
-                
-                return `
-                    <div class="grid-item ${isSelected ? 'selected' : ''}" 
-                         data-file-name="${file.name}" 
-                         onclick="toggleFileSelection('${file.name.replace(/'/g, "\\'")}', event)">
-                        <div class="file-checkbox">
-                            <input type="checkbox" ${isSelected ? 'checked' : ''} 
-                                   onclick="event.stopPropagation()">
-                        </div>
-                        <div class="file-icon text-center">
-                            <i class="${icon.class}" style="color: ${icon.color}"></i>
-                        </div>
-                        <div class="file-name text-truncate fw-bold" title="${file.name}">
-                            ${file.name}
-                        </div>
-                        <div class="file-details">
-                            <small class="text-muted d-block">
-                                <i class="fas fa-folder me-1"></i> ${file.folder}
-                            </small>
-                            <small class="text-muted">
-                                <i class="fas fa-weight me-1"></i> ${file.size_formatted}
-                            </small>
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+    <button class="lightbox-nav lightbox-prev" onclick="navLightbox(-1)"><i class="fas fa-chevron-left"></i></button>
+    <button class="lightbox-nav lightbox-next" onclick="navLightbox(1)"><i class="fas fa-chevron-right"></i></button>
+    <div id="lightbox-content">
+        <div class="lightbox-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+    </div>
+    <div class="lightbox-info" id="lightbox-info"></div>
+</div>
+
+<!-- Copy Modal -->
+<div class="modal fade" id="copyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-download"></i> Copier sur PC</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="copy-setup">
+                    <div class="mb-3">
+                        <label class="form-label">Dossier de destination</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="copy-dest" placeholder="C:\Users\Photos\iPhone">
+                            <button class="btn btn-outline-secondary" type="button" onclick="browseFolder('copy-dest')"><i class="fas fa-folder-open"></i> Parcourir</button>
                         </div>
                     </div>
-                `;
-            }).join('');
-            
-            container.innerHTML = `<div class="grid-view">${gridHtml}</div>`;
-        }
-        
-        // Affichage en liste
-        function displayFilesList(files, container) {
-            const listHtml = `
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th width="40"></th>
-                                <th>Nom</th>
-                                <th>Dossier</th>
-                                <th>Taille</th>
-                                <th>Type</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${files.map(file => {
-                                const icon = getFileIcon(file);
-                                const isSelected = selectedFiles.has(file.name);
-                                
-                                return `
-                                    <tr class="list-row ${isSelected ? 'selected' : ''}" 
-                                        data-file-name="${file.name}"
-                                        onclick="toggleFileSelection('${file.name.replace(/'/g, "\\'")}', event)"
-                                        style="cursor: pointer;">
-                                        <td class="file-checkbox">
-                                            <input type="checkbox" ${isSelected ? 'checked' : ''} 
-                                                   onclick="event.stopPropagation()">
-                                        </td>
-                                        <td>
-                                            <i class="${icon.class} me-2" style="color: ${icon.color}"></i>
-                                            <span title="${file.name}">${file.name}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-light text-dark">${file.folder}</span>
-                                        </td>
-                                        <td>${file.size_formatted}</td>
-                                        <td>
-                                            <span class="badge ${getCategoryBadgeClass(file.category)}">
-                                                ${file.category}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
+                    <p class="text-muted small"><i class="fas fa-shield-alt"></i> Chaque fichier sera vérifié (SHA-256) après copie.</p>
+                    <div id="copy-file-list" class="small text-muted" style="max-height:150px;overflow-y:auto"></div>
                 </div>
-            `;
-            
-            container.innerHTML = listHtml;
+                <div id="copy-progress-area" style="display:none">
+                    <div class="progress mb-2"><div class="progress-bar" id="copy-progress-bar"></div></div>
+                    <p class="small" id="copy-status-text">Copie en cours...</p>
+                    <div id="copy-results" style="max-height:300px;overflow-y:auto"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button class="btn btn-primary" id="copy-start-btn" onclick="startCopy()"><i class="fas fa-copy"></i> Lancer la copie</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move Modal -->
+<div class="modal fade" id="moveModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-arrow-right"></i> Déplacer (copie + vérification intégrité)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="move-setup">
+                    <div class="alert alert-info small">
+                        <i class="fas fa-shield-alt"></i> <strong>Processus sécurisé :</strong> Chaque fichier est copié sur le PC, puis vérifié par comparaison SHA-256 avec l'original sur l'iPhone. Seuls les fichiers dont l'intégrité est confirmée sont marqués comme sauvegardés.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Dossier de destination sur le PC</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="move-dest" placeholder="C:\Users\Photos\iPhone">
+                            <button class="btn btn-outline-secondary" type="button" onclick="browseFolder('move-dest')"><i class="fas fa-folder-open"></i> Parcourir</button>
+                        </div>
+                    </div>
+                    <div id="move-file-list" class="small text-muted" style="max-height:150px;overflow-y:auto"></div>
+                </div>
+                <div id="move-progress-area" style="display:none">
+                    <div class="progress mb-2"><div class="progress-bar bg-success" id="move-progress-bar"></div></div>
+                    <p class="small" id="move-status-text">Copie et vérification en cours...</p>
+                    <div id="move-results" style="max-height:300px;overflow-y:auto"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button class="btn btn-success" id="move-start-btn" onclick="startMove()"><i class="fas fa-shield-alt"></i> Lancer le déplacement sécurisé</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// === State ===
+const state = {
+    folders: [],
+    activeFolder: null,
+    activeCategory: 'all',
+    sortBy: 'name',
+    sortOrder: 'asc',
+    currentPage: 1,
+    pageSize: 60,
+    totalFiles: 0,
+    totalPages: 0,
+    files: [],
+    allLoadedFiles: [],
+    selectedFiles: new Set(),
+    lightboxFiles: [],
+    lightboxIndex: 0,
+    loading: false,
+    copyId: null,
+    thumbCurrentFolder: null,
+    thumbRunning: false,
+    activeView: null,
+};
+
+// === Init ===
+document.addEventListener('DOMContentLoaded', async () => {
+    await init();
+});
+
+async function init() {
+    try {
+        const [foldersRes, statsRes] = await Promise.all([
+            fetch('/api/folders').then(r => r.json()),
+            fetch('/api/stats').then(r => r.json()),
+        ]);
+
+        state.folders = foldersRes;
+
+        // Stats
+        const statsEl = document.getElementById('sidebar-stats');
+        if (statsRes.total_files) {
+            statsEl.textContent = `${statsRes.total_files} fichiers • ${statsRes.total_size || ''}`;
         }
-        
-        // Obtenir l'icône selon le type de fichier
-        function getFileIcon(file) {
-            switch (file.category) {
-                case 'image':
-                    return { class: 'fas fa-image', color: '#28a745' };
-                case 'video':
-                    return { class: 'fas fa-video', color: '#dc3545' };
-                case 'audio':
-                    return { class: 'fas fa-music', color: '#ffc107' };
-                default:
-                    return { class: 'fas fa-file', color: '#6c757d' };
-            }
-        }
-        
-        // Obtenir la classe CSS pour les badges de catégorie
-        function getCategoryBadgeClass(category) {
-            switch (category) {
-                case 'image':
-                    return 'bg-success';
-                case 'video':
-                    return 'bg-danger';
-                case 'audio':
-                    return 'bg-warning';
-                default:
-                    return 'bg-secondary';
-            }
-        }
-        
-        // Changer le mode d'affichage
-        function setViewMode(mode) {
-            currentViewMode = mode;
-            
-            // Mettre à jour les boutons
-            document.getElementById('listViewBtn').classList.toggle('active', mode === 'list');
-            document.getElementById('gridViewBtn').classList.toggle('active', mode === 'grid');
-            
-            // Réafficher les fichiers
-            displayFiles(allFiles);
-        }
-        
-        // Effacer tous les filtres
-        function clearFilters() {
-            document.getElementById('categoryFilter').value = 'all';
-            document.getElementById('selectAllFolders').checked = true;
-            document.querySelectorAll('.folder-checkbox').forEach(cb => cb.checked = true);
-            document.getElementById('sortBy').value = 'name';
-            document.getElementById('sortOrder').value = 'asc';
+
+        renderFolders();
+        setupCategoryChips();
+
+        // Hide loading, show app
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+
+        // Auto-select first folder with files, or show all
+        if (state.folders.length > 0) {
+            // Find the folder currently being processed (first with has_thumbnails or just first)
+            const first = state.folders.find(f => f.has_thumbnails) || state.folders[0];
+            selectFolder(typeof first === 'string' ? first : first.name);
+        } else {
             loadFiles();
         }
-        
-        // Gestion de la sélection
-        function toggleFileSelection(fileName, event) {
-            event.stopPropagation();
-            
-            if (selectedFiles.has(fileName)) {
-                selectedFiles.delete(fileName);
-            } else {
-                selectedFiles.add(fileName);
-            }
-            
-            updateSelectionUI();
+
+        // Start polling thumbnail progress
+        pollThumbnailProgress();
+    } catch (e) {
+        document.getElementById('loading-msg').textContent = 'Erreur de connexion. Rechargez la page.';
+        console.error(e);
+    }
+}
+
+// === Folders ===
+function renderFolders() {
+    const list = document.getElementById('folder-list');
+    // "All" item
+    let html = `<div class="folder-item ${state.activeFolder === null ? 'active' : ''}" onclick="selectFolder(null)">
+        <i class="fas fa-layer-group folder-icon"></i>
+        <span class="folder-name">Tous les fichiers</span>
+    </div>`;
+
+    for (const f of state.folders) {
+        const name = typeof f === 'string' ? f : f.name;
+        const count = typeof f === 'object' ? f.file_count : '';
+        const hasThumbs = typeof f === 'object' && f.has_thumbnails;
+        const isActive = state.activeFolder === name;
+        const isProcessing = state.thumbCurrentFolder === name;
+
+        let statusIcon = '';
+        if (isProcessing) {
+            statusIcon = '<span class="folder-status"><i class="fas fa-circle-notch fa-spin status-active" title="En cours..."></i></span>';
+        } else if (hasThumbs) {
+            statusIcon = '<span class="folder-status"><i class="fas fa-check-circle status-done" title="Vignettes prêtes"></i></span>';
         }
-        
-        // Mettre à jour l'interface de sélection
-        function updateSelectionUI() {
-            const count = selectedFiles.size;
-            const controls = document.getElementById('selectionControls');
-            const countElement = document.getElementById('selectedCount');
-            
-            countElement.textContent = count;
-            
-            if (count > 0) {
-                controls.classList.add('show');
-            } else {
-                controls.classList.remove('show');
-            }
-            
-            // Mettre à jour l'affichage visuel
-            if (currentViewMode === 'grid') {
-                document.querySelectorAll('.grid-item').forEach(item => {
-                    const fileName = item.dataset.fileName;
-                    const checkbox = item.querySelector('.file-checkbox input');
-                    if (selectedFiles.has(fileName)) {
-                        item.classList.add('selected');
-                        checkbox.checked = true;
-                    } else {
-                        item.classList.remove('selected');
-                        checkbox.checked = false;
-                    }
-                });
-            } else {
-                document.querySelectorAll('.list-row').forEach(row => {
-                    const fileName = row.dataset.fileName;
-                    const checkbox = row.querySelector('.file-checkbox input');
-                    if (selectedFiles.has(fileName)) {
-                        row.classList.add('selected');
-                        checkbox.checked = true;
-                    } else {
-                        row.classList.remove('selected');
-                        checkbox.checked = false;
-                    }
-                });
-            }
+
+        html += `<div class="folder-item ${isActive ? 'active' : ''}" onclick="selectFolder('${name.replace(/'/g, "\\'")}')">
+            <i class="fas fa-folder folder-icon"></i>
+            <span class="folder-name" title="${name}">${name}</span>
+            ${count ? `<span class="folder-count">${count}</span>` : ''}
+            ${statusIcon}
+        </div>`;
+    }
+    list.innerHTML = html;
+}
+
+function selectFolder(name) {
+    state.activeFolder = name;
+    state.activeView = null;
+    state.currentPage = 1;
+    state.allLoadedFiles = [];
+    state.selectedFiles.clear();
+    updateSelectionBar();
+    renderFolders();
+    updateViewsActive();
+    loadFiles();
+
+    const bc = document.getElementById('breadcrumb-text');
+    bc.textContent = name || 'Tous les fichiers';
+}
+
+function selectViewLargest() {
+    state.activeFolder = null;
+    state.activeView = 'largest';
+    state.activeCategory = 'all';
+    state.sortBy = 'size';
+    state.sortOrder = 'desc';
+    state.currentPage = 1;
+    state.allLoadedFiles = [];
+    state.selectedFiles.clear();
+    updateSelectionBar();
+    renderFolders();
+    updateViewsActive();
+
+    // Update sort dropdown to match
+    document.getElementById('sort-select').value = 'size-desc';
+
+    loadFiles();
+    document.getElementById('breadcrumb-text').textContent = 'Fichiers volumineux';
+}
+
+function updateViewsActive() {
+    const el = document.getElementById('view-largest');
+    if (state.activeView === 'largest') {
+        el.classList.add('active');
+    } else {
+        el.classList.remove('active');
+    }
+}
+
+// === Categories ===
+function setupCategoryChips() {
+    document.querySelectorAll('.category-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            state.activeCategory = chip.dataset.cat;
+            state.currentPage = 1;
+            state.allLoadedFiles = [];
+            loadFiles();
+        });
+    });
+}
+
+// === Load files (paginated) ===
+async function loadFiles() {
+    if (state.loading) return;
+    state.loading = true;
+
+    const grid = document.getElementById('file-grid');
+    const empty = document.getElementById('empty-state');
+    const spinner = document.getElementById('load-spinner');
+
+    if (state.currentPage === 1) {
+        grid.innerHTML = '';
+        state.allLoadedFiles = [];
+    }
+    spinner.style.display = 'inline-block';
+
+    try {
+        const params = new URLSearchParams({
+            category: state.activeCategory,
+            sort_by: state.sortBy,
+            sort_order: state.sortOrder,
+            page: state.currentPage,
+            page_size: state.pageSize,
+        });
+        if (state.activeFolder) params.append('folders', state.activeFolder);
+
+        const res = await fetch('/api/files?' + params);
+        const data = await res.json();
+
+        // Support both paginated response {files, total, ...} and plain array
+        let files, total;
+        if (Array.isArray(data)) {
+            files = data;
+            total = data.length;
+            state.totalPages = 1;
+        } else {
+            files = data.files || [];
+            total = data.total || files.length;
+            state.totalPages = data.total_pages || 1;
         }
-        
-        // Sélectionner tout
-        function selectAll() {
-            allFiles.forEach(file => selectedFiles.add(file.name));
-            updateSelectionUI();
+
+        state.files = files;
+        state.totalFiles = total;
+        state.allLoadedFiles = state.allLoadedFiles.concat(files);
+
+        document.getElementById('breadcrumb-count').textContent = ` (${total})`;
+
+        if (state.allLoadedFiles.length === 0) {
+            empty.style.display = 'block';
+        } else {
+            empty.style.display = 'none';
+            appendFileCards(files);
         }
-        
-        // Désélectionner tout
-        function clearSelection() {
-            selectedFiles.clear();
-            updateSelectionUI();
+    } catch (e) {
+        console.error('Error loading files:', e);
+    } finally {
+        spinner.style.display = 'none';
+        state.loading = false;
+    }
+}
+
+function appendFileCards(files) {
+    const grid = document.getElementById('file-grid');
+    for (const f of files) {
+        const card = document.createElement('div');
+        card.className = 'file-card' + (state.selectedFiles.has(f.name) ? ' selected' : '') + (f.backed_up ? ' backed-up' : '');
+        card.dataset.name = f.name;
+        card.dataset.folder = f.folder;
+
+        const isMedia = f.is_image || f.is_video;
+        let thumbHtml;
+        if (f.has_thumbnail && f.thumbnail_path) {
+            thumbHtml = `<img src="/static/${f.thumbnail_path}" loading="lazy" alt="">`;
+        } else if (isMedia) {
+            thumbHtml = `<img data-folder="${f.folder}" data-name="${f.name}" class="lazy-thumb" src="" loading="lazy" alt="" style="display:none"><i class="fas ${f.is_video ? 'fa-film' : 'fa-image'} thumb-placeholder"></i>`;
+        } else {
+            const icon = f.category === 'audio' ? 'fa-music' : 'fa-file';
+            thumbHtml = `<i class="fas ${icon} thumb-placeholder"></i>`;
         }
-        
-        // Afficher le modal de déplacement
-        function showMoveModal() {
-            if (selectedFiles.size === 0) {
-                alert('Aucun fichier sélectionné');
-                return;
-            }
-            
-            document.getElementById('moveFileCount').textContent = selectedFiles.size;
-            
-            // Remplir la liste des dossiers existants
-            const targetSelect = document.getElementById('targetFolder');
-            targetSelect.innerHTML = '<option value="">Sélectionner un dossier...</option>';
-            
-            availableFolders.forEach(folder => {
-                targetSelect.innerHTML += `<option value="${folder}">${folder}</option>`;
-            });
-            
-            // Gérer les options radio
-            document.getElementById('newFolderOption').addEventListener('change', function() {
-                document.getElementById('newFolderInput').style.display = this.checked ? 'block' : 'none';
-                document.getElementById('existingFolderSelect').style.display = 'none';
-            });
-            
-            document.getElementById('existingFolderOption').addEventListener('change', function() {
-                document.getElementById('existingFolderSelect').style.display = this.checked ? 'block' : 'none';
-                document.getElementById('newFolderInput').style.display = 'none';
-            });
-            
-            const modal = new bootstrap.Modal(document.getElementById('moveModal'));
-            modal.show();
+
+        const backedUpBadge = f.backed_up ? `<div class="card-backed-up" title="Sauvegardé: ${f.backed_up_path || ''}"><i class="fas fa-shield-alt"></i></div>` : '';
+
+        card.innerHTML = `
+            <div class="thumb-wrap" onclick="handleCardClick(event, '${f.folder}', '${f.name.replace(/'/g, "\\'")}', ${f.is_image || f.is_video})">${thumbHtml}</div>
+            <div class="card-info">
+                <div class="card-name" title="${f.name}">${f.name}</div>
+                <div class="card-meta">${f.size_formatted} • ${f.folder}${f.backed_up ? ' • ✓' : ''}</div>
+            </div>
+            <div class="card-check" onclick="toggleSelect(event, '${f.name.replace(/'/g, "\\'")}', '${f.folder}')"><i class="fas fa-check"></i></div>
+            ${backedUpBadge}
+        `;
+        grid.appendChild(card);
+    }
+
+    // Observe lazy thumbnails
+    card_observeLazy();
+}
+
+// === Lazy thumbnail loading via IntersectionObserver ===
+const thumbObserver = new IntersectionObserver((entries) => {
+    const toLoad = [];
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            toLoad.push(entry.target);
+            thumbObserver.unobserve(entry.target);
         }
-        
-        // Déplacer les fichiers sélectionnés
-        async function moveSelectedFiles() {
-            const selectedOption = document.querySelector('input[name="moveDestination"]:checked');
-            if (!selectedOption) {
-                alert('Veuillez sélectionner une destination');
-                return;
-            }
-            
-            let targetFolder;
-            if (selectedOption.value === 'new') {
-                targetFolder = document.getElementById('newFolderName').value.trim();
-                if (!targetFolder) {
-                    alert('Veuillez entrer un nom de dossier');
-                    return;
+    });
+    // Rate-limit: max 4 concurrent
+    toLoad.forEach(img => thumbQueue.push(img));
+    processThumbQueue();
+}, { threshold: 0.1, rootMargin: '200px' });
+
+const thumbQueue = [];
+let thumbInFlight = 0;
+const MAX_THUMB_CONCURRENT = 4;
+
+function processThumbQueue() {
+    while (thumbInFlight < MAX_THUMB_CONCURRENT && thumbQueue.length > 0) {
+        const img = thumbQueue.shift();
+        thumbInFlight++;
+        const folder = img.dataset.folder;
+        const name = img.dataset.name;
+        fetch(`/api/generate-thumbnail/${encodeURIComponent(folder)}/${encodeURIComponent(name)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.thumbnail_path) {
+                    img.src = '/static/' + data.thumbnail_path;
+                    img.style.display = '';
+                    // Hide placeholder
+                    const placeholder = img.parentElement.querySelector('.thumb-placeholder');
+                    if (placeholder) placeholder.style.display = 'none';
                 }
-            } else {
-                targetFolder = document.getElementById('targetFolder').value;
-                if (!targetFolder) {
-                    alert('Veuillez sélectionner un dossier');
-                    return;
-                }
-            }
-            
-            const filesToMove = Array.from(selectedFiles);
-            
-            try {
-                const response = await fetch('/api/move-files', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        files: filesToMove,
-                        target_folder: targetFolder,
-                        create_folder: selectedOption.value === 'new'
-                    })
+            })
+            .catch(() => {})
+            .finally(() => { thumbInFlight--; processThumbQueue(); });
+    }
+}
+
+function card_observeLazy() {
+    document.querySelectorAll('.lazy-thumb:not([data-observed])').forEach(img => {
+        img.dataset.observed = '1';
+        thumbObserver.observe(img);
+    });
+}
+
+// === Infinite scroll ===
+const scrollObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !state.loading && state.currentPage < state.totalPages) {
+        state.currentPage++;
+        loadFiles();
+    }
+}, { threshold: 0.1 });
+document.addEventListener('DOMContentLoaded', () => {
+    const sentinel = document.getElementById('scroll-sentinel');
+    if (sentinel) scrollObserver.observe(sentinel);
+});
+
+// === Sort ===
+function changeSort() {
+    const val = document.getElementById('sort-select').value;
+    const [sortBy, sortOrder] = val.split('-');
+    state.sortBy = sortBy;
+    state.sortOrder = sortOrder;
+    state.currentPage = 1;
+    state.allLoadedFiles = [];
+    loadFiles();
+}
+
+// === Selection ===
+function toggleSelect(e, name, folder) {
+    e.stopPropagation();
+    const key = name;
+    if (state.selectedFiles.has(key)) {
+        state.selectedFiles.delete(key);
+    } else {
+        state.selectedFiles.add(key);
+    }
+    // Toggle visual
+    document.querySelectorAll(`.file-card[data-name="${CSS.escape(name)}"]`).forEach(c => {
+        c.classList.toggle('selected', state.selectedFiles.has(key));
+    });
+    updateSelectionBar();
+}
+
+function selectAll() {
+    state.allLoadedFiles.forEach(f => state.selectedFiles.add(f.name));
+    document.querySelectorAll('.file-card').forEach(c => c.classList.add('selected'));
+    updateSelectionBar();
+}
+
+function clearSelection() {
+    state.selectedFiles.clear();
+    document.querySelectorAll('.file-card.selected').forEach(c => c.classList.remove('selected'));
+    updateSelectionBar();
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' o';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' Ko';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' Go';
+}
+
+function updateSelectionBar() {
+    const bar = document.getElementById('selection-bar');
+    const count = state.selectedFiles.size;
+    if (count > 0) {
+        bar.classList.add('show');
+        const totalSize = state.allLoadedFiles
+            .filter(f => state.selectedFiles.has(f.name))
+            .reduce((sum, f) => sum + (f.size || 0), 0);
+        document.getElementById('selection-count').textContent = `${count} sélectionné(s) — ${formatBytes(totalSize)}`;
+    } else {
+        bar.classList.remove('show');
+    }
+}
+
+// === Lightbox ===
+function handleCardClick(e, folder, name, isMedia) {
+    if (!isMedia) return;
+    // Build lightbox list from loaded files
+    state.lightboxFiles = state.allLoadedFiles.filter(f => f.is_image || f.is_video);
+    state.lightboxIndex = state.lightboxFiles.findIndex(f => f.name === name && f.folder === folder);
+    if (state.lightboxIndex < 0) state.lightboxIndex = 0;
+    openLightbox();
+}
+
+function openLightbox() {
+    const lb = document.getElementById('lightbox');
+    lb.classList.add('active');
+    showLightboxImage();
+    document.addEventListener('keydown', lightboxKeyHandler);
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('active');
+    document.removeEventListener('keydown', lightboxKeyHandler);
+}
+
+function navLightbox(dir) {
+    state.lightboxIndex += dir;
+    if (state.lightboxIndex < 0) state.lightboxIndex = state.lightboxFiles.length - 1;
+    if (state.lightboxIndex >= state.lightboxFiles.length) state.lightboxIndex = 0;
+    showLightboxImage();
+}
+
+function lightboxKeyHandler(e) {
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') navLightbox(-1);
+    if (e.key === 'ArrowRight') navLightbox(1);
+}
+
+function showLightboxImage() {
+    const f = state.lightboxFiles[state.lightboxIndex];
+    if (!f) return;
+
+    const content = document.getElementById('lightbox-content');
+    const info = document.getElementById('lightbox-info');
+    content.innerHTML = '<div class="lightbox-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+    info.textContent = `${f.name} — ${f.size_formatted} — ${f.folder}`;
+
+    const url = `/api/fullimage/${encodeURIComponent(f.folder)}/${encodeURIComponent(f.name)}`;
+
+    if (f.is_video) {
+        content.innerHTML = `<video src="${url}" controls autoplay class="lightbox-img" style="max-height:80vh"></video>`;
+    } else {
+        const img = new Image();
+        img.className = 'lightbox-img';
+        img.onload = () => { content.innerHTML = ''; content.appendChild(img); };
+        img.onerror = () => { content.innerHTML = '<p style="color:white">Impossible de charger l\'image</p>'; };
+        img.src = url;
+    }
+}
+
+// === Copy ===
+function copySelected() {
+    if (state.selectedFiles.size === 0) return;
+
+    const fileList = document.getElementById('copy-file-list');
+    const files = state.allLoadedFiles.filter(f => state.selectedFiles.has(f.name));
+    fileList.innerHTML = files.map(f => `<div>${f.folder}/${f.name} (${f.size_formatted})</div>`).join('');
+
+    document.getElementById('copy-setup').style.display = '';
+    document.getElementById('copy-progress-area').style.display = 'none';
+    document.getElementById('copy-start-btn').style.display = '';
+    document.getElementById('copy-results').innerHTML = '';
+
+    new bootstrap.Modal(document.getElementById('copyModal')).show();
+}
+
+async function startCopy() {
+    const dest = document.getElementById('copy-dest').value.trim();
+    if (!dest) { alert('Spécifiez un dossier de destination'); return; }
+
+    const files = state.allLoadedFiles
+        .filter(f => state.selectedFiles.has(f.name))
+        .map(f => ({ folder: f.folder, name: f.name }));
+
+    document.getElementById('copy-setup').style.display = 'none';
+    document.getElementById('copy-progress-area').style.display = '';
+    document.getElementById('copy-start-btn').style.display = 'none';
+
+    try {
+        const res = await fetch('/api/copy-files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files, dest_path: dest }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            state.copyId = data.copy_id;
+            pollCopyProgress();
+        } else {
+            document.getElementById('copy-status-text').textContent = 'Erreur: ' + (data.error || 'inconnue');
+        }
+    } catch (e) {
+        document.getElementById('copy-status-text').textContent = 'Erreur réseau';
+    }
+}
+
+async function pollCopyProgress() {
+    if (!state.copyId) return;
+    try {
+        const res = await fetch(`/api/copy-progress/${state.copyId}`);
+        const data = await res.json();
+
+        const pct = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+        document.getElementById('copy-progress-bar').style.width = pct + '%';
+        document.getElementById('copy-progress-bar').textContent = pct + '%';
+
+        const statusText = data.status === 'completed'
+            ? `Terminé: ${data.completed}/${data.total} fichiers`
+            : `Copie en cours: ${data.current_file || ''} (${data.completed}/${data.total})`;
+        document.getElementById('copy-status-text').textContent = statusText;
+
+        // Show results with verification
+        if (data.results && data.results.length > 0) {
+            const resultsHtml = data.results.map(r => {
+                const icon = r.success ? (r.verification && r.verification.verified ? '✅' : '⚠️') : '❌';
+                const detail = r.verification
+                    ? `SHA-256: ${r.verification.hash_match ? '✅' : '❌'} | Taille: ${r.verification.size_match ? '✅' : '❌'} | Nom: ${r.verification.name_match ? '✅' : '❌'}`
+                    : (r.error || '');
+                return `<div class="small mb-1">${icon} <strong>${r.name}</strong> <span class="text-muted">${detail}</span></div>`;
+            }).join('');
+            document.getElementById('copy-results').innerHTML = resultsHtml;
+        }
+
+        if (data.status !== 'completed') {
+            setTimeout(pollCopyProgress, 1000);
+        }
+    } catch (e) {
+        setTimeout(pollCopyProgress, 2000);
+    }
+}
+
+// === Browse folder (native Windows dialog) ===
+async function browseFolder(inputId) {
+    const btn = event.currentTarget;
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+    try {
+        const res = await fetch('/api/browse-folder');
+        const data = await res.json();
+        if (data.success && data.path) {
+            document.getElementById(inputId).value = data.path;
+        }
+    } catch (e) {
+        console.error('Browse error:', e);
+    } finally {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+    }
+}
+
+// === Move (copy + verify + mark backed up) ===
+function moveSelected() {
+    if (state.selectedFiles.size === 0) return;
+
+    const fileList = document.getElementById('move-file-list');
+    const files = state.allLoadedFiles.filter(f => state.selectedFiles.has(f.name));
+    fileList.innerHTML = files.map(f => `<div>${f.backed_up ? '✓ ' : ''}${f.folder}/${f.name} (${f.size_formatted})</div>`).join('');
+
+    document.getElementById('move-setup').style.display = '';
+    document.getElementById('move-progress-area').style.display = 'none';
+    document.getElementById('move-start-btn').style.display = '';
+    document.getElementById('move-results').innerHTML = '';
+
+    new bootstrap.Modal(document.getElementById('moveModal')).show();
+}
+
+async function startMove() {
+    const dest = document.getElementById('move-dest').value.trim();
+    if (!dest) { alert('Spécifiez un dossier de destination'); return; }
+
+    const files = state.allLoadedFiles
+        .filter(f => state.selectedFiles.has(f.name))
+        .map(f => ({ folder: f.folder, name: f.name }));
+
+    document.getElementById('move-setup').style.display = 'none';
+    document.getElementById('move-progress-area').style.display = '';
+    document.getElementById('move-start-btn').style.display = 'none';
+
+    try {
+        const res = await fetch('/api/move-files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files, dest_path: dest }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            state.moveId = data.move_id;
+            pollMoveProgress();
+        } else {
+            document.getElementById('move-status-text').textContent = 'Erreur: ' + (data.error || 'inconnue');
+        }
+    } catch (e) {
+        document.getElementById('move-status-text').textContent = 'Erreur réseau';
+    }
+}
+
+async function pollMoveProgress() {
+    if (!state.moveId) return;
+    try {
+        const res = await fetch(`/api/move-progress/${state.moveId}`);
+        const data = await res.json();
+
+        const pct = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+        document.getElementById('move-progress-bar').style.width = pct + '%';
+        document.getElementById('move-progress-bar').textContent = pct + '%';
+
+        const statusText = data.status === 'completed'
+            ? `Terminé: ${data.completed}/${data.total} fichiers`
+            : `Copie + vérification: ${data.current_file || ''} (${data.completed}/${data.total})`;
+        document.getElementById('move-status-text').textContent = statusText;
+
+        if (data.results && data.results.length > 0) {
+            let verified = 0, failed = 0;
+            const resultsHtml = data.results.map(r => {
+                if (r.verification && r.verification.verified) verified++;
+                else failed++;
+                const icon = r.success
+                    ? (r.verification && r.verification.verified ? '<span class="verify-ok"><i class="fas fa-shield-alt"></i></span>' : '<span class="verify-fail"><i class="fas fa-exclamation-triangle"></i></span>')
+                    : '<span class="verify-fail"><i class="fas fa-times-circle"></i></span>';
+                const detail = r.verification
+                    ? `SHA-256: ${r.verification.hash_match ? '✅' : '❌'} | Taille: ${r.verification.size_match ? '✅' : '❌'}`
+                    : (r.error || 'Erreur');
+                return `<div class="small mb-1">${icon} <strong>${r.name}</strong> <span class="text-muted">${detail}</span></div>`;
+            }).join('');
+            document.getElementById('move-results').innerHTML =
+                `<div class="mb-2 small"><span class="verify-ok"><strong>${verified}</strong> vérifié(s)</span> | <span class="verify-fail"><strong>${failed}</strong> échoué(s)</span></div>` + resultsHtml;
+        }
+
+        if (data.status !== 'completed') {
+            setTimeout(pollMoveProgress, 1000);
+        } else {
+            // Remove successfully moved files from the grid.
+            if (data.results) {
+                const movedNames = new Set(
+                    data.results
+                        .filter(r => r.success && r.verification && r.verification.verified)
+                        .map(r => r.name)
+                );
+                movedNames.forEach(n => state.selectedFiles.delete(n));
+                state.allLoadedFiles = state.allLoadedFiles.filter(f => !movedNames.has(f.name));
+                // Remove cards from DOM.
+                document.querySelectorAll('.file-card').forEach(card => {
+                    const name = card.dataset.name;
+                    if (name && movedNames.has(name)) card.remove();
                 });
-                
-                const result = await response.json();
-                
-                if
+                updateSelectionBar();
+                // Update count.
+                state.totalFiles -= movedNames.size;
+                document.getElementById('breadcrumb-count').textContent = ` (${state.totalFiles})`;
+            }
+        }
+    } catch (e) {
+        setTimeout(pollMoveProgress, 2000);
+    }
+}
+
+// === Thumbnail progress (non-blocking bar) ===
+let lastThumbFolderRefresh = 0;
+
+async function pollThumbnailProgress() {
+    try {
+        const res = await fetch('/api/thumbnail-progress');
+        const data = await res.json();
+
+        const bar = document.getElementById('thumb-progress');
+        const prevFolder = state.thumbCurrentFolder;
+
+        if (data.running) {
+            bar.classList.add('show');
+            const pct = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+            document.getElementById('thumb-progress-bar').style.width = pct + '%';
+            document.getElementById('thumb-progress-count').textContent = `${data.completed}/${data.total} (${data.errors} err)`;
+            document.getElementById('thumb-progress-text').textContent = data.current_folder
+                ? `Dossier: ${data.current_folder}`
+                : 'Génération...';
+
+            state.thumbCurrentFolder = data.current_folder || null;
+            state.thumbRunning = true;
+
+            // Folder changed → refresh folder list to update icons
+            if (prevFolder !== state.thumbCurrentFolder) {
+                refreshFolderList();
+            }
+            // Periodically refresh folder list (every 10s) to update has_thumbnails
+            const now = Date.now();
+            if (now - lastThumbFolderRefresh > 10000) {
+                lastThumbFolderRefresh = now;
+                refreshFolderList();
+            }
+        } else if (data.phase === 'done') {
+            bar.classList.remove('show');
+            if (state.thumbRunning) {
+                state.thumbRunning = false;
+                state.thumbCurrentFolder = null;
+                refreshFolderList();
+            }
+        }
+
+        if (data.running || data.phase === 'scanning' || data.phase === 'generating') {
+            setTimeout(pollThumbnailProgress, 2000);
+        } else if (data.phase === 'done') {
+            // Stop polling — generation finished.
+            return;
+        } else {
+            setTimeout(pollThumbnailProgress, 10000);
+        }
+    } catch (e) {
+        setTimeout(pollThumbnailProgress, 5000);
+    }
+}
+
+async function refreshFolderList() {
+    try {
+        const res = await fetch('/api/folders');
+        state.folders = await res.json();
+        renderFolders();
+    } catch (e) {}
+}
+
+// === Rescan ===
+async function rescan() {
+    if (!confirm('Relancer le scan de l\'iPhone ?')) return;
+    try {
+        await fetch('/api/rescan');
+        location.reload();
+    } catch (e) {
+        alert('Erreur lors du rescan');
+    }
+}
+
+</script>
+</body>
+</html>

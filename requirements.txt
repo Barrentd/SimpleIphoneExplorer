@@ -2,6 +2,7 @@ Flask==2.3.3
 pymtp==0.0.6
 pywin32==306
 Pillow==10.0.1
+pillow-heif>=0.13.0
 python-magic-bin==0.4.14
 Werkzeug==2.3.7
 Jinja2==3.1.2

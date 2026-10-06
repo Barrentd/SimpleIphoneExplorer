@@ -112,3 +112,10 @@ desktop.ini
 # Vscode workspace settings
 .vscode/
 .vscode-test/
+
+# Generated thumbnails
+static/thumbnails/
+
+# Go build output
+/iphone-explorer
+/iphone-explorer.exe
